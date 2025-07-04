@@ -123,16 +123,30 @@ exports.chirpstackWebhook = onRequest(
                     if (buildingData.rooms) {
                       for (const [roomId, roomData] of Object.entries(buildingData.rooms)) {
                         if (roomData.nodes && roomData.nodes[devEui]) {
+                          const nodeData = roomData.nodes[devEui];
+                          const calibratedData = { ...flatData };
+
+                          if (nodeData.calibration && nodeData.calibration.calibrationFactor) {
+                            const calibrationFactor = nodeData.calibration.calibrationFactor;
+                            logger.info(`Applying calibration factor ${calibrationFactor} for node ${devEui}`);
+                            if (typeof calibratedData.electric === 'number') {
+                              calibratedData.electric = parseFloat((calibratedData.electric * calibrationFactor).toFixed(2));
+                            }
+                            if (typeof calibratedData.water === 'number') {
+                              calibratedData.water = parseFloat((calibratedData.water * calibrationFactor).toFixed(2));
+                            }
+                          }
+
                           const nodeRef = db.ref(`buildings/${buildingId}/rooms/${roomId}/nodes/${devEui}`);
-                          if (flatData.batt !== undefined) {
-                            const battV = flatData.batt / 100;
+                          if (calibratedData.batt !== undefined) {
+                            const battV = calibratedData.batt / 100;
                             let batt_percent = ((battV - 3.2) / (4.2 - 3.2)) * 100;
                             batt_percent = Math.round(batt_percent);
                             batt_percent = Math.max(0, Math.min(100, batt_percent));
-                            flatData.batt = batt_percent;
+                            calibratedData.batt = batt_percent;
                           }
 
-                          await nodeRef.child('lastData').update(flatData);
+                          await nodeRef.child('lastData').update(calibratedData);
                           logger.info(`Data replaced in building structure: buildings/${buildingId}/rooms/${roomId}/nodes/${devEui}/lastData`);
                           savedToBuilding = true;
 
@@ -144,7 +158,7 @@ exports.chirpstackWebhook = onRequest(
                             buildingId: buildingId,
                             roomId: roomId,
                             savedPath: `buildings/${buildingId}/rooms/${roomId}/nodes/${devEui}/lastData`,
-                            savedFields: flatData
+                            savedFields: calibratedData
                           });
                           return;
                         }
@@ -218,9 +232,23 @@ exports.chirpstackWebhook = onRequest(
                         if (buildingData.rooms) {
                           for (const [roomId, roomData] of Object.entries(buildingData.rooms)) {
                             if (roomData.nodes && roomData.nodes[devEui]) {
+                              const nodeData = roomData.nodes[devEui];
+                              const calibratedData = { ...flatData };
+
+                                                             if (nodeData.calibration && nodeData.calibration.calibrationFactor) {
+                                 const calibrationFactor = nodeData.calibration.calibrationFactor;
+                                 logger.info(`Applying calibration factor ${calibrationFactor} for node ${devEui} (unknown event)`);
+                                 if (typeof calibratedData.electric === 'number') {
+                                   calibratedData.electric = parseFloat((calibratedData.electric * calibrationFactor).toFixed(2));
+                                 }
+                                 if (typeof calibratedData.water === 'number') {
+                                   calibratedData.water = parseFloat((calibratedData.water * calibrationFactor).toFixed(2));
+                                 }
+                               }
+
                               const nodeRef = db.ref(`buildings/${buildingId}/rooms/${roomId}/nodes/${devEui}`);
                               await nodeRef.child('lastData').remove();
-                              await nodeRef.child('lastData').set(flatData);
+                              await nodeRef.child('lastData').set(calibratedData);
                               savedToBuilding = true;
                               response.status(200).json({
                                 success: true,
@@ -230,7 +258,7 @@ exports.chirpstackWebhook = onRequest(
                                 buildingId: buildingId,
                                 roomId: roomId,
                                 savedPath: `buildings/${buildingId}/rooms/${roomId}/nodes/${devEui}/lastData`,
-                                savedFields: flatData
+                                savedFields: calibratedData
                               });
                               return;
                             }
