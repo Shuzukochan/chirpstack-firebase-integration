@@ -128,12 +128,15 @@ exports.chirpstackWebhook = onRequest(
 
                           if (nodeData.calibration && nodeData.calibration.calibrationFactor) {
                             const calibrationFactor = nodeData.calibration.calibrationFactor;
-                            logger.info(`Applying calibration factor ${calibrationFactor} for node ${devEui}`);
+                            const offset = nodeData.calibration.offset || 0;
+                            logger.info(`Applying calibration factor ${calibrationFactor} and offset ${offset} for node ${devEui}`);
                             if (typeof calibratedData.electric === 'number') {
-                              calibratedData.electric = parseFloat((calibratedData.electric * calibrationFactor).toFixed(2));
+                              calibratedData.electric = (calibratedData.electric * calibrationFactor) + offset;
+                              calibratedData.electric = Math.round(calibratedData.electric * 100) / 100;
                             }
                             if (typeof calibratedData.water === 'number') {
-                              calibratedData.water = parseFloat((calibratedData.water * calibrationFactor).toFixed(2));
+                              calibratedData.water *= calibrationFactor;
+                              calibratedData.water = Math.round(calibratedData.water * 10000) / 10000;
                             }
                           }
 
@@ -235,16 +238,19 @@ exports.chirpstackWebhook = onRequest(
                               const nodeData = roomData.nodes[devEui];
                               const calibratedData = { ...flatData };
 
-                                                             if (nodeData.calibration && nodeData.calibration.calibrationFactor) {
-                                 const calibrationFactor = nodeData.calibration.calibrationFactor;
-                                 logger.info(`Applying calibration factor ${calibrationFactor} for node ${devEui} (unknown event)`);
-                                 if (typeof calibratedData.electric === 'number') {
-                                   calibratedData.electric = parseFloat((calibratedData.electric * calibrationFactor).toFixed(2));
-                                 }
-                                 if (typeof calibratedData.water === 'number') {
-                                   calibratedData.water = parseFloat((calibratedData.water * calibrationFactor).toFixed(2));
-                                 }
-                               }
+                              if (nodeData.calibration && nodeData.calibration.calibrationFactor) {
+                                const calibrationFactor = nodeData.calibration.calibrationFactor;
+                                const offset = nodeData.calibration.offset || 0;
+                                logger.info(`Applying calibration factor ${calibrationFactor} and offset ${offset} for node ${devEui} (unknown event)`);
+                                if (typeof calibratedData.electric === 'number') {
+                                  calibratedData.electric = (calibratedData.electric * calibrationFactor) + offset;
+                                  calibratedData.electric = Math.round(calibratedData.electric * 100) / 100;
+                                }
+                                if (typeof calibratedData.water === 'number') {
+                                  calibratedData.water *= calibrationFactor;
+                                  calibratedData.water = Math.round(calibratedData.water * 10000) / 10000;
+                                }
+                              }
 
                               const nodeRef = db.ref(`buildings/${buildingId}/rooms/${roomId}/nodes/${devEui}`);
                               await nodeRef.child('lastData').remove();
